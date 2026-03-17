@@ -1,0 +1,290 @@
+# AURUM Metals Stack Configuration
+# Version: 0.2.0
+# Last Updated: 2026-02-15
+#
+# Defines all instruments, regime thresholds, and MSIL parameters.
+# Subordinate to signals.yaml (WMCE v0.1.0).
+
+version: "0.2.0"
+
+# ============================================================
+# INSTRUMENT UNIVERSE
+# ============================================================
+
+futures_stack:
+  - ticker: GC1
+    name: Gold
+    bucket: precious_monetary
+    exchange: CME
+    frequency: [1min, daily]
+    notes: "Already in WMCE. Primary signal substrate."
+
+  - ticker: SI1
+    name: Silver
+    bucket: precious_industrial
+    exchange: CME
+    frequency: [1min, daily]
+    notes: "Already in WMCE. Confirmation signal."
+
+  - ticker: HG1
+    name: Copper
+    bucket: industrial_cyclical
+    exchange: CME
+    frequency: daily
+    notes: "Key cyclical indicator. AI infra proxy (testable)."
+
+  - ticker: ALI
+    name: Aluminum
+    bucket: industrial_energy
+    exchange: LME
+    frequency: daily
+    notes: "Energy-intensive. LME holiday calendar differs from CME."
+
+  - ticker: PL1
+    name: Platinum
+    bucket: precious_industrial
+    exchange: CME
+    frequency: daily
+    notes: "Industrial precious. Auto catalyst demand."
+
+  - ticker: PA1
+    name: Palladium
+    bucket: industrial_auto
+    exchange: CME
+    frequency: daily
+    notes: "Auto catalyst. Declining share to platinum. Volatile."
+
+equities_etfs:
+  # Precious Mining
+  - ticker: GDX
+    name: VanEck Gold Miners ETF
+    bucket: precious_mining
+    options: true
+    frequency: daily
+    notes: "Primary gold miner proxy. Liquid options."
+
+  - ticker: NEM
+    name: Newmont Corporation
+    bucket: precious_mining_single
+    options: true
+    frequency: daily
+    notes: "Largest gold miner. Liquid options."
+
+  - ticker: AEM
+    name: Agnico Eagle Mines
+    bucket: precious_mining_single
+    options: true
+    frequency: daily
+    notes: "Senior gold producer."
+
+  - ticker: GOLD
+    name: Barrick Gold
+    bucket: precious_mining_single
+    options: true
+    frequency: daily
+    notes: "Major gold/copper producer."
+
+  # Industrial Mining
+  - ticker: COPX
+    name: Global X Copper Miners ETF
+    bucket: industrial_mining
+    options: true  # Check liquidity
+    frequency: daily
+    notes: "Copper miners basket. Options may be illiquid."
+
+  - ticker: FCX
+    name: Freeport-McMoRan
+    bucket: industrial_mining_single
+    options: true
+    frequency: daily
+    notes: "Largest public copper producer. Liquid options."
+
+  - ticker: RIO
+    name: Rio Tinto
+    bucket: diversified_mining
+    options: true
+    frequency: daily
+    notes: "Diversified major. Iron ore, copper, aluminum."
+
+  # Energy / Nuclear
+  - ticker: URA
+    name: Global X Uranium ETF
+    bucket: energy_nuclear
+    options: true  # Check liquidity
+    frequency: daily
+    notes: "Uranium proxy. No liquid uranium futures."
+
+  # Battery / Speculative
+  - ticker: LIT
+    name: Global X Lithium & Battery Tech ETF
+    bucket: battery_speculative
+    options: true  # Low liquidity expected
+    frequency: daily
+    notes: "Lithium proxy. Speculative. Use for regime detection only."
+
+  # Rare Earth
+  - ticker: MP
+    name: MP Materials
+    bucket: rare_earth
+    options: true
+    frequency: daily
+    notes: "Only major US rare earth producer. IPO Jul 2020 — short history."
+    min_history_date: "2020-07-15"
+
+# ============================================================
+# DERIVED RATIOS
+# ============================================================
+
+derived_ratios:
+  - name: gold_copper
+    formula: "GC1 / HG1"
+    interpretation: "Monetary vs cyclical preference"
+    key_regime_indicator: true
+
+  - name: gold_silver
+    formula: "GC1 / SI1"
+    interpretation: "Stress gauge (already in WMCE)"
+    key_regime_indicator: true
+
+  - name: gold_platinum
+    formula: "GC1 / PL1"
+    interpretation: "Monetary premium over industrial precious"
+    key_regime_indicator: false
+
+  - name: gdx_gc_normalized
+    formula: "GDX / GC1 (index-normalized)"
+    interpretation: "Miner leverage vs spot — equity risk appetite"
+    key_regime_indicator: true
+
+  - name: copx_gdx
+    formula: "COPX / GDX"
+    interpretation: "Industrial vs precious mining sentiment"
+    key_regime_indicator: true
+
+  - name: industrial_precious_spread
+    formula: "mean(HG, ALI) - mean(GC, SI) [21d returns]"
+    interpretation: "Cyclical vs monetary macro state"
+    key_regime_indicator: true
+
+# ============================================================
+# DISPERSION ENGINE PARAMETERS
+# ============================================================
+
+dispersion:
+  mdi:
+    lookback_days: 21
+    long_lookback_days: 252
+    stack: [GC1, SI1, HG1, ALI, PL1, PA1]
+    interpretation_bands:
+      low: [0, 25]
+      normal: [25, 50]
+      elevated: [50, 75]
+      extreme: [75, 100]
+
+  gls:
+    lookback_days: 21
+    lead_lag_range: [-5, 5]  # Days
+    beta_lookback: 21
+    beta_negative_threshold: -0.2
+    beta_positive_threshold: 0.2
+
+  smb:
+    high_threshold_days: 20
+    ma_threshold_days: 50
+    divergence_threshold: -0.02  # -2%
+    universe: [GC1, SI1, HG1, ALI, PL1, PA1, GDX, COPX, URA, NEM, FCX]
+
+  imdi:
+    monetary_metals: [GC1, SI1]
+    industrial_metals: [HG1, ALI, PL1]
+    lookback_days: 21
+    long_lookback_days: 252
+
+# ============================================================
+# REGIME CLASSIFIER
+# ============================================================
+
+regime_classifier:
+  macro_stress:
+    gls_threshold: 50
+    imdi_z_threshold: 1.0
+    mdi_max_percentile: 60
+    vix_min: 20
+    sra_high: 10
+    sra_moderate: 5
+
+  ai_infra_capex:
+    gls_threshold: 0          # Gold NOT leading
+    copper_gold_z_threshold: 1.0
+    mdi_max_percentile: 50
+    vix_max: 18
+    sra_default: -10
+    sra_gold_leading: -5
+
+  speculative_rotation:
+    mdi_threshold: 75
+    single_outlier_z: 2.0
+    volume_spike_ratio: 2.0
+    sra: -15
+
+  energy_geopolitics:
+    ura_z_threshold: 1.0
+    energy_metals_corr_threshold: 0.3
+    gls_min: 0
+    sra: 5
+
+  low_vol_stability:
+    mdi_max: 25
+    gold_rv_percentile_max: 25
+    vix_max: 14
+    max_metal_z: 1.0
+    sra: -10
+
+  min_score_for_regime: 40
+  min_days_for_mtce: 5
+
+# ============================================================
+# SRA INTEGRATION RULES
+# ============================================================
+
+sra:
+  range: [-15, 10]
+  integration_rules:
+    wmce_killed: "SRA ignored entirely"
+    wmce_dormant: "SRA logged but not applied"
+    wmce_monitoring: "SRA applied, trade capped at SMALL"
+    wmce_active: "SRA fully applied to WRS"
+  cannot_increase_position_size: true
+  cannot_override_wmce_shutdown: true
+
+# ============================================================
+# MTCE LIMITS
+# ============================================================
+
+mtce:
+  max_single_trade_risk_pct: 0.005         # 0.5% NAV
+  max_total_open_exposure_pct: 0.0075      # 0.75% NAV
+  max_single_name_pct: 0.003              # 0.3% NAV
+  max_combined_wmce_mtce_pct: 0.020       # 2.0% NAV
+  max_pct_of_wmce_allocation: 0.50        # 50% cap
+  correlation_reduction_threshold: 0.6    # If WMCE-MTCE corr > 0.6, reduce MTCE 50%
+  shutdown:
+    rolling_8wk_loss_threshold: -0.05     # -5% of MTCE capital
+    trailing_12_trade_loss_rate: 0.60     # >60% losers
+    regime_failure_weeks: 4               # Misclassification streak
+    recovery_clear_weeks: 2
+
+# ============================================================
+# DATA QUALITY FLAGS
+# ============================================================
+
+data_quality:
+  max_forward_fill_days: 1
+  holiday_calendar: NYSE
+  lme_holidays_flag: true                  # ALI trades when US doesn't
+  min_history_years: 5
+  short_history_instruments:
+    - ticker: MP
+      available_from: "2020-07-15"
+      note: "IPO date. ~4.5 years of data."
+  etf_rebalance_exclusion_days: 2          # Don't trade ±2 days of rebalance

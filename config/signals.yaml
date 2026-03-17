@@ -1,0 +1,223 @@
+# AURUM Signal Configuration
+# Version: 0.1.0
+# Last Updated: 2025-02-15
+#
+# ALL signal thresholds live here. Never hardcode in Python.
+# Changes to this file should be git-tagged and justified.
+
+version: "0.1.0"
+
+# ============================================================
+# PRIMARY SIGNALS
+# ============================================================
+
+s1_friday_gold_momentum:
+  max_score: 25
+  lookback_days: 63            # Trading days for median calculation
+  threshold_multiplier: 2.0    # |return| must exceed 2x median
+  description: >
+    Measures whether Friday gold price action is outsized
+    relative to recent daily return distribution.
+
+s2_friday_gold_volume:
+  max_score: 15
+  lookback_days: 21            # Trading days for mean volume
+  trigger_threshold: 1.3       # Volume ratio to trigger signal
+  threshold_low: 1.0           # Score scaling lower bound
+  threshold_high: 2.0          # Score scaling upper bound
+  description: >
+    Detects elevated Friday volume suggesting institutional
+    repositioning ahead of weekend.
+
+s3_vol_term_structure:
+  max_score: 20
+  lookback_days: 63            # For percentile ranking
+  inversion_threshold: -2.0    # Vol points (1W IV - 1M IV)
+  description: >
+    Identifies backwardation in gold vol term structure.
+    Short-dated IV exceeding long-dated IV signals elevated
+    near-term fear.
+
+s4_gap_momentum:
+  max_score: 15
+  short_window_weeks: 4
+  long_window_weeks: 12
+  threshold_ratio: 1.5         # Short/long must exceed 1.5x
+  confidence: 0.5              # Always low — tiny sample
+  description: >
+    Tracks whether recent weekend gaps are increasing relative
+    to longer-term average. WARNING: very small sample size.
+
+s5_cross_asset_stress:
+  max_score: 15
+  components:
+    vix_change:
+      threshold: 1.5           # VIX points
+      score: 5
+    dxy_change_pct:
+      threshold: 0.005         # 0.5%
+      score: 3
+    ust10y_change_bps:
+      threshold: 5.0           # 5 basis points
+      score: 2
+    btc_change_pct:
+      threshold: 0.03          # 3%
+      score: 5
+  description: >
+    Multi-asset stress indicator. Multiple assets showing
+    stress simultaneously confirms macro risk event.
+
+# ============================================================
+# CONFIRMATION SIGNALS
+# ============================================================
+
+c1_silver_sympathy:
+  bonus_score: 5
+  penalty_score: -10
+  correlation_threshold_high: 0.7    # Confirm above
+  correlation_threshold_low: 0.3     # Penalize below
+  move_ratio_range: [0.5, 2.0]      # Silver/gold return ratio
+  description: >
+    Silver moving with gold confirms macro risk.
+    Silver diverging from gold suggests gold-specific flow
+    (false signal).
+
+c2_equity_preposition:
+  bonus_score: 5
+  threshold: -0.003            # SPX PM return < -0.3%
+  measurement_window: "14:00-16:00 ET"
+  description: >
+    Equities selling into Friday close confirms risk-off
+    positioning ahead of weekend.
+
+# ============================================================
+# NLP LAYER
+# ============================================================
+
+nlp_narrative_pressure:
+  max_score: 10
+  decay_halflife_hours: 6
+  lookback_hours: 48
+  tier1_weight: 3
+  tier2_weight: 1
+  tier1_keywords:
+    geopolitical:
+      - war
+      - invasion
+      - nuclear
+      - sanctions
+      - escalation
+      - missile
+      - military
+      - conflict
+      - retaliation
+    financial:
+      - default
+      - contagion
+      - liquidity crisis
+      - bank run
+      - margin call
+      - systemic risk
+  tier2_keywords:
+    central_bank:
+      - emergency meeting
+      - rate decision
+      - hawkish surprise
+      - dovish pivot
+      - intervention
+    macro:
+      - recession
+      - inflation surge
+      - debt ceiling
+      - downgrade
+      - tariff
+      - trade war
+
+nlp_event_calendar:
+  max_score: 5
+  events:
+    g7_g20: 5
+    opec: 3
+    central_bank_speech: 2       # Max 3 speeches scored = +6, capped at 5
+    election: 5
+    geopolitical_deadline: 5
+
+# Combined NLP cap
+nlp_combined_cap: 15
+
+# ============================================================
+# COMPOSITE SCORING
+# ============================================================
+
+composite:
+  cap: 100
+  iv_override:
+    wrs_threshold: 90
+    iv_percentile_threshold: 90
+    size_reduction: 0.5
+  description: >
+    When WRS > 90 AND Friday gold IV is at >90th percentile,
+    the weekend risk may already be priced into options.
+    Reduce size by 50%.
+
+# ============================================================
+# TRADE RECOMMENDATION THRESHOLDS
+# ============================================================
+
+trade_thresholds:
+  no_trade: [0, 20]
+  monitor: [21, 40]
+  small: [41, 60]
+  standard: [61, 80]
+  maximum: [81, 100]
+
+# ============================================================
+# POSITION LIMITS (HARD)
+# ============================================================
+
+position_limits:
+  max_single_weekend_risk_pct: 0.015      # 1.5% of NAV
+  max_rolling_4wk_drawdown_pct: 0.05      # 5% → pause
+  max_rolling_12wk_drawdown_pct: 0.15     # 15% → KILLED
+  max_single_instrument_pct_adv: 0.20     # 20% of avg daily volume
+  max_combined_weekend_exposure_pct: 0.025 # 2.5% NAV if multiple strategies
+
+# ============================================================
+# REGIME FILTER
+# ============================================================
+
+regime:
+  gap_magnitude_trend:
+    lookback_weeks: 8
+    ratio_threshold: 1.2
+    weeks_below_to_trigger: 4
+  gold_vol_regime:
+    lookback_days: 252
+    percentile_threshold: 20
+  vix_regime:
+    level_threshold: 14
+    weeks_below_to_trigger: 4
+  edge_profitability:
+    lookback_weeks: 12
+    drawdown_threshold: -0.15
+  options_pricing_adaptation:
+    iv_rv_ratio_threshold: 1.3
+    weeks_above_to_trigger: 4
+  recovery:
+    weeks_clear_for_active: 2
+
+# ============================================================
+# EXECUTION PARAMETERS
+# ============================================================
+
+execution:
+  entry_window: "14:30-15:30 ET"
+  hard_deadline: "16:00 ET"
+  slippage_assumptions:
+    normal: 0.05               # 5% of mid
+    gap_move: 0.10             # 10% slippage on gaps > 3%
+  commission_per_contract: 2.0  # Round-trip
+  exit_rules:
+    zero_dte_hard_exit: "Monday 11:00 ET"
+    weekly_default_exit: "Wednesday if no movement"
+    profit_taking_gap_threshold: 0.015  # 1.5% gap → scale out 50%
