@@ -7,8 +7,8 @@ import { Navigation } from "@/components/ui/Navigation";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AURUM Dashboard",
-  description: "Weekend Macro Convexity Engine",
+  title: "Nexus Alpha",
+  description: "Quantitative Signal Aggregation & Market Intelligence Platform",
 };
 
 export default function RootLayout({

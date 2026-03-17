@@ -25,21 +25,23 @@ from api.routers import analysis_router, history_router, backtest_router, trades
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="AURUM API",
+    title="Nexus Alpha API",
     description="""
-    Weekend Macro Convexity Engine API
+    ## Quantitative Signal Aggregation & Market Intelligence Platform
 
-    AURUM analyzes weekend risk premium in gold markets and generates
-    trade recommendations for options strategies.
+    Nexus Alpha is a sophisticated quantitative trading system that detects market
+    regime shifts, aggregates multi-factor signals, and generates risk-adjusted
+    trade recommendations using real-time market data.
 
-    ## Features
+    ### Core Capabilities
 
-    - **Analysis**: Run live or demo WRS analysis
-    - **History**: Track historical WRS scores and outcomes
-    - **Backtest**: Run backtests over historical data
-    - **Trades**: Trade journal for logging actual trades
+    - **Signal Analysis** — Multi-factor signal engine with 7 weighted components
+    - **Regime Detection** — 5-state FSM for automatic edge monitoring
+    - **NLP Intelligence** — Real-time headline analysis with velocity tracking
+    - **Backtesting** — Historical performance validation with attribution
+    - **Trade Journal** — Full P&L tracking and outcome analysis
     """,
-    version="0.1.0",
+    version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -68,16 +70,16 @@ app.include_router(nlp_router)
 async def startup_event():
     """Initialize database on startup."""
     init_db()
-    print("AURUM API started. Database initialized.")
+    print("Nexus Alpha API started. Database initialized.")
 
 
 @app.get("/")
 async def root():
     """Root endpoint - API info."""
     return {
-        "name": "AURUM API",
-        "version": "0.1.0",
-        "description": "Weekend Macro Convexity Engine",
+        "name": "Nexus Alpha",
+        "version": "1.0.0",
+        "description": "Quantitative Signal Aggregation & Market Intelligence Platform",
         "docs": "/docs",
         "endpoints": {
             "analysis": "/api/analysis",
